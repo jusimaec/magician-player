@@ -233,6 +233,26 @@
       accessToken = data.access_token;
     }
 
+    async function loadLogo(path) {
+      try {
+        await getAccessToken();
+        const res = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ path })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const logoImg = document.querySelector('.logo-img');
+        if (logoImg) logoImg.src = data.link;
+      } catch (err) {
+        console.log('로고 로드 실패:', err);
+      }
+    }
+
     async function loadFiles() {
       const container = document.getElementById('file-list');
       try {
@@ -249,7 +269,20 @@
         if (!response.ok) throw new Error(`API 오류: ${response.status}`);
 
         const data = await response.json();
-        const files = data.entries.filter(e => e['.tag'] === 'file');
+
+        // 로고 파일 찾기 (파일명에 'logo' 포함된 png/jpg)
+        const logoFile = data.entries.find(e => 
+          e['.tag'] === 'file' && 
+          /logo/i.test(e.name) && 
+          /\.(png|jpg|jpeg)$/i.test(e.name)
+        );
+        if (logoFile) loadLogo(logoFile.path_lower);
+
+        // 로고 파일 제외하고 나머지만 표시
+        const files = data.entries.filter(e => 
+          e['.tag'] === 'file' && 
+          !(/logo/i.test(e.name) && /\.(png|jpg|jpeg)$/i.test(e.name))
+        );
 
         if (files.length === 0) {
           container.innerHTML = '<div class="empty">파일이 없습니다.</div>';
