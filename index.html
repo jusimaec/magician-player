@@ -220,12 +220,26 @@
   </div>
 
   <script>
-    const CLIENT_ID = 'uge8w7eabqu19pv';
-    const CLIENT_SECRET = 'rrs2v0lb229j6po';
-    const REFRESH_TOKEN = 'BcEtOAKf76IAAAAAAAAAAUvhYBw7a692H6YmzPE9qo_yVIBxgoPDgJFwRRpVXj3H';
-    const FOLDER_PATH = '';
-
+    // ===== 설정값 (같은 폴더의 config.json에서 읽어옴) =====
+    // MFC 등 다른 프로그램에서도 이 config.json을 그대로 읽으므로 순수 JSON 형식을 유지함
+    // 키가 바뀌어도 이 파일 자체는 수정할 필요 없이, config.json 내용만 갱신하면 됨
+    let CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN, FOLDER_PATH;
     let accessToken = null;
+
+    async function loadConfig() {
+      const res = await fetch('config.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`config.json 로드 실패 (${res.status})`);
+      const cfg = await res.json();
+
+      CLIENT_ID = cfg.dropbox_client_id;
+      CLIENT_SECRET = cfg.dropbox_client_secret;
+      REFRESH_TOKEN = cfg.dropbox_refresh_token;
+      FOLDER_PATH = cfg.folder_path || '';
+
+      if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
+        throw new Error('config.json에 dropbox_client_id/dropbox_client_secret/dropbox_refresh_token 값이 없습니다.');
+      }
+    }
 
     async function getAccessToken() {
       const res = await fetch('https://api.dropbox.com/oauth2/token', {
@@ -235,26 +249,6 @@
       });
       const data = await res.json();
       accessToken = data.access_token;
-    }
-
-    async function loadLogo(path) {
-      try {
-        await getAccessToken();
-        const res = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ path })
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const logoImg = document.querySelector('.logo-img');
-        if (logoImg) logoImg.src = data.link;
-      } catch (err) {
-        console.log('로고 로드 실패:', err);
-      }
     }
 
     async function loadLogo(path) {
@@ -385,7 +379,16 @@
       }
     }
 
-    loadFiles();
+    // ===== 시작점: config.json 로드 후 파일 목록 불러오기 =====
+    (async function init() {
+      const container = document.getElementById('file-list');
+      try {
+        await loadConfig();
+        loadFiles();
+      } catch (err) {
+        container.innerHTML = `<div class="error">⚠️ 설정 파일을 불러오지 못했습니다.<br><small>${err.message}</small></div>`;
+      }
+    })();
   </script>
 </body>
 </html>
